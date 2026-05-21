@@ -1,0 +1,85 @@
+{
+  "schema_version": 2,
+  "scores": [
+    {
+      "score": 48,
+      "name": "GRA",
+      "date": "2026-05-08T10:51:13.524798Z",
+      "food_eaten": 51,
+      "mine_shrinks": 1,
+      "invincibility_count": 0
+    },
+    {
+      "score": 46,
+      "name": "GGG",
+      "date": "2026-05-11T13:33:15.882921Z",
+      "food_eaten": 52,
+      "mine_shrinks": 2,
+      "invincibility_count": 0
+    },
+    {
+      "food_eaten": 0,
+      "mine_shrinks": 0,
+      "invincibility_count": 0,
+      "score": 25,
+      "name": "GCS",
+      "date": "2026-04-20T15:14:12.814646Z"
+    },
+    {
+      "food_eaten": 0,
+      "mine_shrinks": 0,
+      "invincibility_count": 0,
+      "score": 7,
+      "name": "GCS",
+      "date": "2026-04-28T09:49:28.987125Z"
+    },
+    {
+      "score": 6,
+      "name": "GGG",
+      "date": "2026-05-11T12:39:57.232558Z",
+      "food_eaten": 6,
+      "mine_shrinks": 0,
+      "invincibility_count": 0
+    },
+    {
+      "score": 6,
+      "name": "CCC",
+      "date": "2026-05-11T12:48:54.383789Z",
+      "food_eaten": 18,
+      "mine_shrinks": 4,
+      "invincibility_count": 0
+    },
+    {
+      "food_eaten": 0,
+      "mine_shrinks": 0,
+      "invincibility_count": 0,
+      "score": 5,
+      "name": "GCS",
+      "date": "2026-05-01T11:32:47.836606Z"
+    },
+    {
+      "food_eaten": 0,
+      "mine_shrinks": 0,
+      "invincibility_count": 0,
+      "score": 4,
+      "name": "GCS",
+      "date": "2026-04-21T07:31:33.993115Z"
+    },
+    {
+      "score": 2,
+      "name": "GGG",
+      "date": "2026-05-18T13:08:36.259300Z",
+      "food_eaten": 2,
+      "mine_shrinks": 0,
+      "invincibility_count": 0
+    },
+    {
+      "score": 1,
+      "name": "GGG",
+      "date": "2026-05-11T07:37:19.205376Z",
+      "food_eaten": 1,
+      "mine_shrinks": 0,
+      "invincibility_count": 0
+    }
+  ]
+}

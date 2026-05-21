@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #2d0057 0%, #6a0dad 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+        }
+
+        .game-container {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 3em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #gameCanvas {
+            border: 4px solid #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            background: #1a0030;
+        }
+
+        .score-display {
+            margin-top: 20px;
+            font-size: 1.5em;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .controls {
+            margin-top: 20px;
+            font-size: 1em;
+            opacity: 0.8;
+        }
+
+        .game-over-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 40px;
+            border-radius: 15px;
+            border: 3px solid white;
+            display: none;
+            text-align: center;
+        }
+
+        .game-over-overlay.show {
+            display: block;
+        }
+
+        .game-over-overlay h2 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            color: #ff4444;
+        }
+
+        .game-over-overlay p {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+
+        .game-over-overlay .instruction {
+            font-size: 1em;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🐍 Snake Game</h1>
+        <canvas id="gameCanvas" width="600" height="600"></canvas>
+        <div class="score-display">Score: <span id="score">0</span></div>
+        <div class="controls">
+            Use Arrow Keys to move • Space to restart • ESC to pause
+        </div>
+    </div>
+
+    <div class="game-over-overlay" id="gameOverOverlay">
+        <h2>Game Over!</h2>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <p class="instruction">Press SPACE to restart</p>
+    </div>
+
+    <script>
+        // Constants
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const GRID_SIZE = 20;
+        const GRID_WIDTH = canvas.width / GRID_SIZE;
+        const GRID_HEIGHT = canvas.height / GRID_SIZE;
+        const GAME_SPEED = 150; // milliseconds per frame
+
+        // Colors
+        const FOOD_COLOR = '#FFFFFF';     // Food color (white)
+        const GREEN = '#00FF00';     // Bonus foods only
+        const DARK_GREEN = '#006400';
+        const BLACK = '#1a0030';  // Dark purple background
+        const WHITE = '#FFFFFF';
+        const GRID_COLOR = '#282828';
+
+        // Mine colors and timing
+        const MINE_COLOR_A = '#FF0000';
+        const MINE_COLOR_B = '#C8C8C8';
+        const MINE_FLASH_INTERVAL = 200; // milliseconds
+
+        // Mine Detonation Storm constants
+        const STORM_TRIGGER_COUNT = 10;
+        const STORM_BORDER_COLOR_A = '#FF0000';
+        const STORM_BORDER_COLOR_B = '#000000';
+        const STORM_BORDER_FLASH_INTERVAL = 200;
+        const WARNING_DURATION_MS = 3000;
+        const WARNING_FLASH_INTERVAL = 200;
+        const EXPLOSION_DURATION_MS = 1000;
+        const EXPLOSION_COLORS = ['#FF0000', '#FF8800', '#FFFF00', '#FFFFFF', '#FF4400'];
+
+        // Invincibility Power-Up constants
+        const SUPER_FOOD_COLOR_A = '#FFFF00';
+        const SUPER_FOOD_COLOR_B = '#000000';
+        const SUPER_FOOD_FLASH_INTERVAL = 250;
+        const INVINCIBILITY_DURATION_MS = 10000;
+        const INVINCIBILITY_COLOR = '#FFFF00';
+        const INVINCIBILITY_MUSIC_PATH = 'music/chiptune_triumphant.wav';
+        const HUD_INVINCIBILITY_OFFSET = 5 * GRID_SIZE;
+
+        // Snake color palette (bright colors visible on dark backgrounds)
+        const SNAKE_COLORS = [
+            '#0064FF',      // Bright Blue
+            '#00FFFF',      // Cyan
+            '#32FF32',      // Lime Green
+            '#FFFF00',      // Yellow
+            '#FFA500',      // Orange
+            '#FF3232',      // Red
+            '#FF00FF',      // Magenta
+            '#FF69B4',      // Hot Pink
+        ];
+
+        // Directions
+        const UP = { x: 0, y: -1 };
+        const DOWN = { x: 0, y: 1 };
+        const LEFT = { x: -1, y: 0 };
+        const RIGHT = { x: 1, y: 0 };
+
+        // Game state
+        let snake = [{ x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) }];
+        let direction = RIGHT;
+        let nextDirection = RIGHT;
+        let food = generateFood();
+        let score = 0;
+        let gameOver = false;
+        let gameLoop = null;
+        let colorIndex = 0;  // Track current snake color
+
+
+        // Mine state
+        let mines = [];
+        let mineFlashState = false;
+        let mineFlashTimer = null;
+
+        // Storm state
+        let stormActive = false;
+        let stormQueue = [];
+        let stormPhase = null;
+        let stormCurrentMine = null;
+        let stormPhaseTimer = null;
+        let stormWarningFlashState = false;
+        let stormWarningFlashTimer = null;
+        let borderFlashState = false;
+        let borderFlashTimer = null;
+        let bonusFoods = [];
+
+        // Invincibility Power-Up state
+        let superFoodPosition = null;
+        let superFoodFlashState = false;
+        let superFoodFlashTimer = null;
+        let superFoodMineIndex = null;
+        let superFoodMineCounter = 0;
+        let invincibilityActive = false;
+        let invincibilityTimerRemaining = 0;
+        let invincibilityCountdownTimer = null;
+        let invincibilityEndTimer = null;
+        let invincibilityAudio = null;
+
+        function startStorm() {
+            stormActive = true;
+            stormQueue = mines.map(m => ({x: m.x, y: m.y}));
+            stormQueue.sort(() => Math.random() - 0.5);
+            mines = [];
+            superFoodMineIndex = Math.floor(Math.random() * stormQueue.length);
+            superFoodMineCounter = 0;
+            if (superFoodPosition !== null) {
+                superFoodPosition = null;
+                if (superFoodFlashTimer) { clearInterval(superFoodFlashTimer); superFoodFlashTimer = null; }
+            }
+            borderFlashState = false;
+            if (borderFlashTimer) clearInterval(borderFlashTimer);
+            borderFlashTimer = setInterval(() => {
+                borderFlashState = !borderFlashState;
+            }, STORM_BORDER_FLASH_INTERVAL);
+            beginWarningPhase();
+        }
+
+        function beginWarningPhase() {
+            if (stormQueue.length === 0) { endStorm(); return; }
+            stormCurrentMine = stormQueue.shift();
+            stormPhase = 'warning';
+            stormWarningFlashState = false;
+            if (stormWarningFlashTimer) clearInterval(stormWarningFlashTimer);
+            stormWarningFlashTimer = setInterval(() => {
+                stormWarningFlashState = !stormWarningFlashState;
+            }, WARNING_FLASH_INTERVAL);
+            if (stormPhaseTimer) clearTimeout(stormPhaseTimer);
+            stormPhaseTimer = setTimeout(beginExplosionPhase, WARNING_DURATION_MS);
+        }
+
+        function beginExplosionPhase() {
+            stormPhase = 'explosion';
+            if (superFoodMineIndex !== null && superFoodMineCounter === superFoodMineIndex) {
+                superFoodPosition = {x: stormCurrentMine.x, y: stormCurrentMine.y};
+                superFoodFlashState = false;
+                if (superFoodFlashTimer) clearInterval(superFoodFlashTimer);
+                superFoodFlashTimer = setInterval(() => { superFoodFlashState = !superFoodFlashState; }, SUPER_FOOD_FLASH_INTERVAL);
+            }
+            superFoodMineCounter++;
+            bonusFoods.push({x: stormCurrentMine.x, y: stormCurrentMine.y});
+            if (stormWarningFlashTimer) clearInterval(stormWarningFlashTimer);
+            stormWarningFlashTimer = null;
+            if (stormPhaseTimer) clearTimeout(stormPhaseTimer);
+            stormPhaseTimer = setTimeout(() => {
+                if (stormQueue.length > 0) {
+                    beginWarningPhase();
+                } else {
+                    endStorm();
+                }
+            }, EXPLOSION_DURATION_MS);
+        }
+
+        function endStorm() {
+            stormActive = false;
+            stormPhase = null;
+            stormCurrentMine = null;
+            stormQueue = [];
+            borderFlashState = false;
+            if (borderFlashTimer) clearInterval(borderFlashTimer);
+            borderFlashTimer = null;
+            if (stormWarningFlashTimer) clearInterval(stormWarningFlashTimer);
+            stormWarningFlashTimer = null;
+            if (stormPhaseTimer) clearTimeout(stormPhaseTimer);
+            stormPhaseTimer = null;
+        }
+
+        function activateInvincibility() {
+            invincibilityActive = true;
+            invincibilityTimerRemaining = 10;
+            if (invincibilityCountdownTimer) clearInterval(invincibilityCountdownTimer);
+            invincibilityCountdownTimer = setInterval(() => {
+                invincibilityTimerRemaining = Math.max(0, invincibilityTimerRemaining - 1);
+            }, 1000);
+            if (invincibilityEndTimer) clearTimeout(invincibilityEndTimer);
+            invincibilityEndTimer = setTimeout(endInvincibility, INVINCIBILITY_DURATION_MS);
+            try {
+                invincibilityAudio = new Audio(INVINCIBILITY_MUSIC_PATH);
+                invincibilityAudio.play().catch(e => console.warn('Invincibility music error:', e));
+            } catch(e) {
+                console.warn('Could not load invincibility music:', e);
+            }
+        }
+
+        function endInvincibility() {
+            invincibilityActive = false;
+            invincibilityTimerRemaining = 0;
+            if (invincibilityCountdownTimer) clearInterval(invincibilityCountdownTimer);
+            invincibilityCountdownTimer = null;
+            if (invincibilityEndTimer) clearTimeout(invincibilityEndTimer);
+            invincibilityEndTimer = null;
+            if (invincibilityAudio) {
+                invincibilityAudio.pause();
+                invincibilityAudio.currentTime = 0;
+                invincibilityAudio = null;
+            }
+        }
+
+        // Initialize game
+        function drawRulesScreen() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Test1 Rules', canvas.width / 2, 160);
+
+            ctx.fillStyle = '#C8C8C8';
+            ctx.font = '20px Arial';
+            const lines = [
+                'Use the arrow keys to control the snake.',
+                'Eat the green apples to grow and increase your score.',
+                'Avoid hitting the walls or yourself.',
+                'The game gets harder as you grow longer.',
+            ];
+            lines.forEach((line, i) => {
+                ctx.fillText(line, canvas.width / 2, 250 + i * 42);
+            });
+
+            ctx.fillStyle = '#969696';
+            ctx.font = '15px Arial';
+            ctx.fillText('Press any key or click to continue', canvas.width / 2, 500);
+
+            ctx.textAlign = 'left';
+        }
+
+        function init() {
+            snake = [{ x: Math.floor(GRID_WIDTH / 2), y: Math.floor(GRID_HEIGHT / 2) }];
+            direction = RIGHT;
+            nextDirection = RIGHT;
+            food = generateFood();
+            score = 0;
+            gameOver = false;
+            colorIndex = 0;  // Reset color
+            paused = false;
+            document.getElementById('score').textContent = score;
+            document.getElementById('gameOverOverlay').classList.remove('show');
+
+            // Mine reset and flash timer
+            mines = [];
+            mineFlashState = false;
+            if (mineFlashTimer) clearInterval(mineFlashTimer);
+            mineFlashTimer = setInterval(() => { mineFlashState = !mineFlashState; }, MINE_FLASH_INTERVAL);
+
+            // Storm state reset
+            stormActive = false;
+            stormQueue = [];
+            stormPhase = null;
+            stormCurrentMine = null;
+            bonusFoods = [];
+            borderFlashState = false;
+            if (borderFlashTimer) clearInterval(borderFlashTimer);
+            borderFlashTimer = null;
+            if (stormWarningFlashTimer) clearInterval(stormWarningFlashTimer);
+            stormWarningFlashTimer = null;
+            if (stormPhaseTimer) clearTimeout(stormPhaseTimer);
+            stormPhaseTimer = null;
+
+            // Invincibility state reset
+            superFoodPosition = null;
+            superFoodFlashState = false;
+            if (superFoodFlashTimer) { clearInterval(superFoodFlashTimer); superFoodFlashTimer = null; }
+            superFoodMineIndex = null;
+            superFoodMineCounter = 0;
+            invincibilityActive = false;
+            invincibilityTimerRemaining = 0;
+            if (invincibilityCountdownTimer) { clearInterval(invincibilityCountdownTimer); invincibilityCountdownTimer = null; }
+            if (invincibilityEndTimer) { clearTimeout(invincibilityEndTimer); invincibilityEndTimer = null; }
+            if (invincibilityAudio) { invincibilityAudio.pause(); invincibilityAudio.currentTime = 0; invincibilityAudio = null; }
+            
+            if (gameLoop) clearInterval(gameLoop);
+            gameLoop = null;
+
+            if (showRules) {
+                drawRulesScreen();
+                function dismissRules() {
+                    showRules = false;
+                    gameLoop = setInterval(update, GAME_SPEED);
+                }
+                document.addEventListener('keydown', dismissRules, { once: true });
+                canvas.addEventListener('click', dismissRules, { once: true });
+            } else {
+                gameLoop = setInterval(update, GAME_SPEED);
+            }
+        }
+
+        // Generate random food position
+        function generateFood() {
+            let newFood;
+            do {
+                newFood = {
+                    x: Math.floor(Math.random() * GRID_WIDTH),
+                    y: Math.floor(Math.random() * GRID_HEIGHT)
+                };
+            } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+            return newFood;
+        }
+
+        // Attempt to spawn a new mine with validated placement
+        function trySpawnMine() {
+            const expectedCount = 1 + Math.floor(score / 5);
+            const minesToAdd = expectedCount - mines.length;
+            if (minesToAdd <= 0) return;
+            for (let m = 0; m < minesToAdd; m++) {
+                for (let attempt = 0; attempt < 1000; attempt++) {
+                    const cx = Math.floor(Math.random() * GRID_WIDTH);
+                    const cy = Math.floor(Math.random() * GRID_HEIGHT);
+                    const tooClose = snake.some(s => Math.abs(cx - s.x) + Math.abs(cy - s.y) <= 10);
+                    if (tooClose) continue;
+                    const onSnake = snake.some(s => s.x === cx && s.y === cy);
+                    if (onSnake) continue;
+                    // Collision-course path check
+                    const path = [];
+                    let px = snake[0].x + direction.x;
+                    let py = snake[0].y + direction.y;
+                    while (px >= 0 && px < GRID_WIDTH && py >= 0 && py < GRID_HEIGHT) {
+                        path.push({x: px, y: py});
+                        px += direction.x;
+                        py += direction.y;
+                    }
+                    if (path.some(p => p.x === cx && p.y === cy)) continue;
+                    if (food.x === cx && food.y === cy) continue;
+                    if (mines.some(mi => mi.x === cx && mi.y === cy)) continue;
+                    mines.push({x: cx, y: cy});
+                    break;
+                }
+                // silently skip if 1000 attempts exhausted
+            }
+        }
+
+        // Update game state
+        function update() {
+            if (gameOver) return;
+            if (paused) return;
+
+            direction = nextDirection;
+
+            // Calculate new head position
+            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+            // Check wall collision
+            if (head.x < 0 || head.x >= GRID_WIDTH || head.y < 0 || head.y >= GRID_HEIGHT) {
+                if (!invincibilityActive) { endGame(); return; }
+            }
+
+            // Check self collision
+            if (snake.some(segment => segment.x === head.x && segment.y === head.y)) {
+                if (!invincibilityActive) { endGame(); return; }
+            }
+
+            // Phase 2 explosion kill check (before unshift, consistent with wall/self checks)
+            if (stormActive && stormPhase === 'explosion' && stormCurrentMine) {
+                const mx = stormCurrentMine.x;
+                const my = stormCurrentMine.y;
+                
+                for (let segment of snake) {
+                    let segmentInBlast = false;
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            const cx = mx + dx;
+                            const cy = my + dy;
+                            if (cx >= 0 && cx < GRID_WIDTH && cy >= 0 && cy < GRID_HEIGHT) {
+                                if (segment.x === cx && segment.y === cy) {
+                                    segmentInBlast = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (segmentInBlast) break;
+                    }
+                    if (segmentInBlast) {
+                        if (!invincibilityActive) { endStorm(); endGame(); return; }
+                    }
+                }
+            }
+
+            // Mine collision check (before unshift, consistent with ordering)
+            const mineHitIndex = mines.findIndex(m => m.x === head.x && m.y === head.y);
+            if (mineHitIndex !== -1) {
+                if (!invincibilityActive) {
+                    mines.splice(mineHitIndex, 1);
+                    const shrink = Math.min(3, snake.length);
+                    snake.splice(snake.length - shrink, shrink);
+                    score = Math.max(0, score - 3);
+                    document.getElementById('score').textContent = score;
+                    if (snake.length === 0) {
+                        endGame();
+                        return;
+                    }
+                }
+            }
+
+            snake.unshift(head);
+
+            // Super-Food collision
+            if (superFoodPosition !== null && head.x === superFoodPosition.x && head.y === superFoodPosition.y) {
+                superFoodPosition = null;
+                if (superFoodFlashTimer) { clearInterval(superFoodFlashTimer); superFoodFlashTimer = null; }
+                if (!invincibilityActive) { activateInvincibility(); }
+            }
+
+            // Bonus food consumption
+            const bonusHitIndex = bonusFoods.findIndex(b => b.x === head.x && b.y === head.y);
+            if (bonusHitIndex !== -1) {
+                bonusFoods.splice(bonusHitIndex, 1);
+                score++;
+                colorIndex = (colorIndex + 1) % SNAKE_COLORS.length;
+                document.getElementById('score').textContent = score;
+                trySpawnMine();
+                // grow: do not pop tail this tick
+            } else if (head.x === food.x && head.y === food.y) {
+                // Check food consumption
+                score++;
+                colorIndex = (colorIndex + 1) % SNAKE_COLORS.length;
+                document.getElementById('score').textContent = score;
+                food = generateFood();
+                trySpawnMine();
+                // Storm trigger
+                if (!stormActive && mines.length >= STORM_TRIGGER_COUNT) {
+                    startStorm();
+                }
+            } else {
+                snake.pop();
+            }
+
+            draw();
+        }
+
+        // Draw game
+        function draw() {
+            // Clear canvas
+            ctx.fillStyle = BLACK;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid
+            ctx.strokeStyle = GRID_COLOR;
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += GRID_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            // Storm border
+            if (stormActive && borderFlashState) {
+                ctx.strokeStyle = STORM_BORDER_COLOR_A;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+            }
+
+            // Explosion cells (Phase 2)
+            if (stormActive && stormPhase === 'explosion' && stormCurrentMine) {
+                const mx = stormCurrentMine.x;
+                const my = stormCurrentMine.y;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const cx = mx + dx;
+                        const cy = my + dy;
+                        if (cx >= 0 && cx < GRID_WIDTH && cy >= 0 && cy < GRID_HEIGHT) {
+                            ctx.fillStyle = EXPLOSION_COLORS[Math.floor(Math.random() * EXPLOSION_COLORS.length)];
+                            ctx.fillRect(cx * GRID_SIZE, cy * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+                        }
+                    }
+                }
+            }
+
+            // Warning cell (Phase 1)
+            if (stormActive && stormPhase === 'warning' && stormCurrentMine) {
+                const wColor = stormWarningFlashState ? EXPLOSION_COLORS[0] : EXPLOSION_COLORS[2];
+                ctx.fillStyle = wColor;
+                ctx.fillRect(
+                    stormCurrentMine.x * GRID_SIZE, stormCurrentMine.y * GRID_SIZE,
+                    GRID_SIZE, GRID_SIZE);
+            }
+
+            // Draw mines (after grid, before snake)
+            const mineColor = mineFlashState ? MINE_COLOR_A : MINE_COLOR_B;
+            mines.forEach(m => {
+                ctx.fillStyle = mineColor;
+                ctx.fillRect(m.x * GRID_SIZE + 1, m.y * GRID_SIZE + 1, GRID_SIZE - 2, GRID_SIZE - 2);
+            });
+
+            // Draw bonus foods (always GREEN)
+            bonusFoods.forEach(b => {
+                const bx = b.x * GRID_SIZE + GRID_SIZE / 2;
+                const by = b.y * GRID_SIZE + GRID_SIZE / 2;
+                const br = GRID_SIZE / 2 - 2;
+                ctx.fillStyle = GREEN;
+                ctx.beginPath();
+                ctx.arc(bx, by, br, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+
+            // Draw Super-Food
+            if (superFoodPosition !== null) {
+                ctx.fillStyle = superFoodFlashState ? SUPER_FOOD_COLOR_A : SUPER_FOOD_COLOR_B;
+                ctx.fillRect(superFoodPosition.x * GRID_SIZE, superFoodPosition.y * GRID_SIZE, GRID_SIZE, GRID_SIZE);
+            }
+
+            // Draw snake with current color
+            const currentColor = invincibilityActive ? INVINCIBILITY_COLOR : SNAKE_COLORS[colorIndex];
+            snake.forEach((segment, index) => {
+                const x = segment.x * GRID_SIZE;
+                const y = segment.y * GRID_SIZE;
+
+                // Snake body
+                ctx.fillStyle = currentColor;
+                ctx.fillRect(x + 1, y + 1, GRID_SIZE - 2, GRID_SIZE - 2);
+                
+                // Draw eyes on head
+                if (index === 0) {
+                    ctx.fillStyle = WHITE;
+                    const eyeRadius = GRID_SIZE / 8;
+                    const leftEyeX = x + GRID_SIZE / 4;
+                    const rightEyeX = x + 3 * GRID_SIZE / 4;
+                    const eyeY = y + GRID_SIZE / 4;
+                    
+                    // Left eye
+                    ctx.beginPath();
+                    ctx.arc(leftEyeX, eyeY, eyeRadius, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    // Right eye
+                    ctx.beginPath();
+                    ctx.arc(rightEyeX, eyeY, eyeRadius, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    // Pupils
+                    ctx.fillStyle = BLACK;
+                    ctx.beginPath();
+                    ctx.arc(leftEyeX, eyeY, eyeRadius / 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(rightEyeX, eyeY, eyeRadius / 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+
+                // Add border to make segments visible
+                ctx.strokeStyle = BLACK;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 1, y + 1, GRID_SIZE - 2, GRID_SIZE - 2);
+            });
+
+            // INV countdown HUD
+            if (invincibilityActive) {
+                ctx.fillStyle = INVINCIBILITY_COLOR;
+                ctx.font = 'bold 18px Arial';
+                ctx.textBaseline = 'top';
+                const invSecs = Math.ceil(invincibilityTimerRemaining);
+                ctx.fillText('INV: ' + invSecs, 10 + HUD_INVINCIBILITY_OFFSET + 80, canvas.height - 24);
+            }
+
+            // Draw food (ALWAYS YELLOW per .cursorrules)
+            const foodX = food.x * GRID_SIZE + GRID_SIZE / 2;
+            const foodY = food.y * GRID_SIZE + GRID_SIZE / 2;
+            const foodRadius = GRID_SIZE / 2 - 2;
+
+            // Main food circle
+            ctx.fillStyle = FOOD_COLOR;
+            ctx.beginPath();
+            ctx.arc(foodX, foodY, foodRadius, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Shine effect
+            ctx.fillStyle = 'rgba(255, 255, 200, 0.6)';
+            ctx.beginPath();
+            ctx.arc(foodX - foodRadius / 3, foodY - foodRadius / 3, foodRadius / 2, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Border
+            ctx.strokeStyle = '#CCCC00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(foodX, foodY, foodRadius, 0, 2 * Math.PI);
+            ctx.stroke();
+            
+            // Draw pause overlay
+            if (paused && !gameOver) {
+                // Semi-transparent overlay
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // PAUSED text
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = '72px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2 - 40);
+                
+                // Instruction text
+                ctx.font = '36px Arial';
+                ctx.fillText('Press P to Resume', canvas.width / 2, canvas.height / 2 + 40);
+            }
+        }
+
+        // End game
+        function endGame() {
+            gameOver = true;
+            clearInterval(gameLoop);
+            if (mineFlashTimer) clearInterval(mineFlashTimer);
+            if (borderFlashTimer) clearInterval(borderFlashTimer);
+            borderFlashTimer = null;
+            if (stormWarningFlashTimer) clearInterval(stormWarningFlashTimer);
+            stormWarningFlashTimer = null;
+            if (stormPhaseTimer) clearTimeout(stormPhaseTimer);
+            stormPhaseTimer = null;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverOverlay').classList.add('show');
+        }
+
+        // Handle keyboard input
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ') {
+                e.preventDefault();
+                if (gameOver) {
+                    init();
+                }
+            } else if (e.key === 'p' || e.key === 'P') {
+                e.preventDefault();
+                if (!gameOver) {
+                    paused = !paused;
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                if (!gameOver) {
+                    if (gameLoop) {
+                        clearInterval(gameLoop);
+                        gameLoop = null;
+                    } else {
+                        gameLoop = setInterval(update, GAME_SPEED);
+                    }
+                }
+            } else if (!gameOver) {
+                switch (e.key) {
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        if (direction !== DOWN) nextDirection = UP;
+                        break;
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        if (direction !== UP) nextDirection = DOWN;
+                        break;
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        if (direction !== RIGHT) nextDirection = LEFT;
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        if (direction !== LEFT) nextDirection = RIGHT;
+                        break;
+                }
+            }
+        });
+
+        // Start the game
+        init();
+    </script>
+</body>
+</html>
+

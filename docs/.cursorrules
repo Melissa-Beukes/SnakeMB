@@ -1,0 +1,106 @@
+# .cursorrules — Snake Game Repository
+
+This `.cursorrules` file serves as the AI assistant knowledge index.
+Whenever working in Cursor, the following documents **must be preloaded and treated as the base architectural context** before any code is written, debugged, or refactored.
+
+---
+
+## Mandatory Reference Documents
+
+- [docs/architecture.md](architecture.md) — System architecture and design patterns
+- [docs/structure.md](structure.md) — Project organization and folder structure
+- [docs/code.md](code.md) — Code patterns and conventions
+- [docs/dataflow.md](dataflow.md) — Data flow and system boundaries
+- [docs/decisions.md](decisions.md) — Architectural decisions and rationale (ADRs)
+- [docs/glossary.md](glossary.md) — Domain terminology and definitions
+- [docs/risk.md](risk.md) — Security and risk management
+- [docs/file-context-todo.md](file-context-todo.md) — File-by-file documentation coverage tracker
+
+---
+
+## Purpose
+
+These documents collectively describe the architecture, structure, code workflows, dataflows, risks, glossary, and per-file coverage of the Snake Game repository (Pygame, Tkinter, Console, and HTML variants plus the shared `game_logic.py` and `leaderboard.py` modules).
+
+They are **mandatory reading before**:
+
+- Developing new features (e.g. new game mechanics, leaderboard changes)
+- Debugging gameplay, scoring, or persistence issues
+- Refactoring shared modules (`game_logic.py`, `leaderboard.py`)
+- Modifying any of the four game frontends (`snake_game.py`, `snake_game_tkinter.py`, `snake_game_console.py`, `snake_game.html`)
+- Changing test layout, `pytest.ini`, or batch launchers
+
+---
+
+## Cursor Development Rules
+
+1. **Preload and parse** all documents listed above before making any context-sensitive recommendation.
+2. Treat these documents as the **single source of truth** for:
+   - Architecture & design guidelines
+   - Coding standards and conventions
+   - Dataflows and state logic
+   - Security & risk management
+   - Domain terminology
+3. **Cross-check with docs** whenever code details appear ambiguous or under-specified.
+4. **Update `/docs` as part of feature completion** — a feature is not "done" until both code and the relevant context packs are updated.
+5. **Maintain a TODO list** for every task:
+   - Break each task into explicit subtasks.
+   - Track progress with `[ ]` pending, `[x]` done, `[-]` skipped/blocked.
+   - Update consistently to avoid missed steps.
+6. **No hallucination rule**: only suggest APIs, classes, functions, constants, or logic that are present in the repository or explicitly documented in `/docs`. If something is not verifiable, say so.
+7. **Verification-first workflow**:
+   - Use `codebase_search`, `read_file`, or `grep` **before** assuming any detail (function signature, constant value, file path, schema field).
+   - Do not assume hidden or undocumented functionality.
+   - Confirm constants (e.g. `GRID_SIZE`, `FOOD_COLOR`, schema version) by reading the actual source, not memory.
+8. **Consistency required**: all changes must align with `architecture.md`, `structure.md`, `code.md`, `dataflow.md`, and `decisions.md`. If a change contradicts an ADR, the ADR must be updated first.
+9. **Security checks**: always evaluate
+   - File-system access patterns (e.g. `highscores.json` path handling)
+   - Hard-coded absolute paths (already a known risk — see `risk.md`)
+   - Input validation (player names, WASD input, JSON migration)
+   - JSON schema migration safety (legacy bare-list → v2 envelope)
+10. **Performance checks**: evaluate
+    - Game loop tick rate and frame budget
+    - Storm/flash timer cost (`setInterval`, `winsound`, Pygame events)
+    - Particle effect counts and collision-check complexity
+    - Leaderboard read/write frequency
+
+---
+
+## Repository-Specific Rules
+
+- **Four parallel game implementations exist** (`snake_game.py`, `snake_game_tkinter.py`, `snake_game_console.py`, `snake_game.html`). When changing gameplay rules, check whether the change applies to one, some, or all variants and document the scope.
+- **Only `snake_game.py` (Pygame) imports `game_logic.py`.** Do not assume the Tkinter, Console, or HTML variants share these helpers — they currently re-implement logic inline.
+- **Leaderboard schema is v2** (`{schema_version: 2, scores: [...]}`) with auto-migration from legacy bare-list. Any schema change requires a new ADR in `decisions.md` and a migration path.
+- **`pytest.ini` collects only `tests/`** — root-level `test_*.py` files (e.g. `test_leaderboard.py`, `test_food_color.py`) are unittest-style and run separately. Respect this split.
+- **`.bak`, `.bak-mds`, `.bak-pre-white-food` files are manual snapshots**, not VCS history. Do not edit them. See `decisions.md` for the manual-rollback ADR.
+- **Feature folders** (`flashing-mines/`, `mine-detonation-storm/`) are **process artefacts** (Plan, Build, ToDo, lessons-learned), not runtime code. Read them for historical context when touching the corresponding feature.
+- **Hard-coded paths** exist in `pytest.bat` and elsewhere — flagged in `risk.md`. Do not introduce new ones without an ADR.
+
+---
+
+## Workflow for Any Code Change
+
+1. Read all mandatory reference documents above.
+2. Read `file-context-todo.md` to confirm the target file is covered and current.
+3. Break the task into subtasks in a TODO list.
+4. Use `codebase_search` / `read_file` to verify every assumption.
+5. Implement the change, keeping it consistent with `code.md` conventions.
+6. Run the relevant tests (`pytest` for `tests/`, direct `python` for root-level unittest files).
+7. Update `/docs` (any of the seven context packs that are affected) **and** `file-context-todo.md` if files were added, removed, or materially changed.
+8. Mark TODO items complete.
+
+---
+
+## Success Criteria
+
+- Cursor must **never operate without the context docs loaded**.
+- All decisions and code recommendations rely on the verified context packs.
+- A feature is only "done" when **code, tests, and `/docs` are all updated**.
+- No unsupported assumptions: every claim about the codebase must be traceable to a file or doc.
+- Solutions must remain consistent across the four game variants where applicable, and any divergence must be intentional and documented.
+
+---
+
+## Important — No-Assumption Rule
+
+**Do not make any assumptions.** All data, claims, function signatures, constants, schema fields, and behaviours referenced in code or documentation must be **true and sourced from a direct finding** in the repository or context packs. If a fact cannot be verified by reading a file, it must not be stated.
