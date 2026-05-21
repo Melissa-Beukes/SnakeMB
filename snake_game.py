@@ -19,7 +19,7 @@ pygame.init()
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 FOOD_COLOR = (255, 255, 255)   # Food color (white)
-DARK_BLUE = (80, 0, 120)  # For gradient background (purple)
+DARK_BLUE = (139, 0, 0)  # For gradient background (red)
 LIGHT_BLUE_SHINE = (180, 230, 255)  # For food shine effect (lighter blue)
 LIGHT_YELLOW = (255, 255, 200)  # For super food shine effect (unused by regular food)
 GREEN = (0, 255, 0)     # Bonus foods only
@@ -507,7 +507,7 @@ def draw_food_particles(screen):
             new_particles.append(particle)
     food_particles = new_particles
 
-BG_TOP = (20, 0, 40)  # Dark purple for top of background gradient
+BG_TOP = (40, 0, 0)  # Dark red for top of background gradient
 
 def draw_gradient_background(screen):
     for y in range(GRID_PIXEL_HEIGHT):

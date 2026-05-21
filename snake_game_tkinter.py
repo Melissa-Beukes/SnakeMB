@@ -146,14 +146,14 @@ class SnakeGame:
         self.root.resizable(False, False)
         
         # Create canvas
-        self.canvas = tk.Canvas(root, width=WINDOW_WIDTH, height=WINDOW_HEIGHT, bg='#1a0030')
+        self.canvas = tk.Canvas(root, width=WINDOW_WIDTH, height=WINDOW_HEIGHT, bg='#3a0000')
         self.canvas.pack()
         self.paused = False
         
         # Score label — positioned below canvas using pack geometry manager
-        self.score_label = tk.Label(root, text="Score: 0", font=("Arial", 16), bg='#1a0030', fg='white')
+        self.score_label = tk.Label(root, text="Score: 0", font=("Arial", 16), bg='#3a0000', fg='white')
         self.score_label.pack(fill='x', padx=10, pady=5)
-        self.inv_label = tk.Label(root, text="", font=("Arial", 16), bg='#1a0030', fg='#FFFF00')
+        self.inv_label = tk.Label(root, text="", font=("Arial", 16), bg='#3a0000', fg='#FFFF00')
         self.inv_label.pack(fill='x', padx=10, pady=0)
         
         # Initialize leaderboard manager
